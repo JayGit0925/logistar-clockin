@@ -1,0 +1,37 @@
+generator client {
+    provider = "prisma-client-js"
+    binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x"]
+    output = "/home/ubuntu/time_tracking_app/nextjs_space/node_modules/.prisma/client"
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+model Worker {
+  id         String      @id @default(uuid())
+  name       String
+  employeeId String?
+  pin        String      @default("")
+  createdAt  DateTime    @default(now())
+  timeEntries TimeEntry[]
+
+  @@index([name])
+}
+
+model TimeEntry {
+  id         String    @id @default(uuid())
+  workerId   String
+  worker     Worker    @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  clockIn    DateTime
+  lunchOut   DateTime?
+  lunchIn    DateTime?
+  clockOut   DateTime?
+  totalHours Float?
+  date       String
+  createdAt  DateTime  @default(now())
+
+  @@index([workerId])
+  @@index([date])
+}
