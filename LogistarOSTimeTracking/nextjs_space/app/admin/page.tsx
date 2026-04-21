@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Shield, Download, Users, Clock } from 'lucide-react';
+import { Shield, Download, Users, Clock, Plus } from 'lucide-react';
 import { TimeEntriesTable } from './_components/time-entries-table';
 import { Filters } from './_components/filters';
+import { AddTimeModal } from './_components/add-time-modal';
 import { LanguageSelector } from '@/components/language-selector';
 import { useLanguage } from '@/lib/language-context';
 import toast from 'react-hot-toast';
@@ -21,6 +22,8 @@ export default function AdminPage() {
     startDate: '',
     endDate: '',
   });
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     const auth = sessionStorage.getItem('admin_authenticated');
@@ -176,19 +179,38 @@ export default function AdminPage() {
               <Clock className="w-5 h-5 text-blue-600" />
               <h2 className="text-xl font-semibold text-gray-900">{t('timeEntries')}</h2>
             </div>
-            <button
-              onClick={handleExport}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-            >
-              <Download className="w-4 h-4" />
-              <span>{t('exportCsv')}</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                <span>{t('addEntry')}</span>
+              </button>
+              <button
+                onClick={handleExport}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                <span>{t('exportCsv')}</span>
+              </button>
+            </div>
           </div>
           <Filters filters={filters} setFilters={setFilters} />
         </div>
 
-        <TimeEntriesTable filters={filters} />
+        <TimeEntriesTable filters={filters} refreshKey={refreshKey} />
       </div>
+
+      {showAddModal && (
+        <AddTimeModal
+          onClose={() => setShowAddModal(false)}
+          onSaved={() => {
+            setShowAddModal(false);
+            setRefreshKey((k) => k + 1);
+          }}
+        />
+      )}
     </div>
   );
 }

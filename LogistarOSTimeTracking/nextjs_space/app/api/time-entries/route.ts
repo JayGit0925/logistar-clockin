@@ -44,7 +44,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { workerId, clockIn } = body;
+    const { workerId, clockIn, lunchOut, lunchIn, clockOut, force } = body;
 
     if (!workerId || !clockIn) {
       return NextResponse.json(
@@ -53,23 +53,42 @@ export async function POST(request: Request) {
       );
     }
 
-    // Prevent duplicate: check if there's an incomplete shift (no clockOut)
-    const activeShift = await prisma.timeEntry.findFirst({
-      where: { workerId, clockOut: null },
-    });
+    if (!force) {
+      // Prevent duplicate: check if there's an incomplete shift (no clockOut)
+      const activeShift = await prisma.timeEntry.findFirst({
+        where: { workerId, clockOut: null },
+      });
 
-    if (activeShift) {
-      return NextResponse.json(
-        { error: 'Worker already has an active shift' },
-        { status: 400 }
-      );
+      if (activeShift) {
+        return NextResponse.json(
+          { error: 'Worker already has an active shift' },
+          { status: 400 }
+        );
+      }
     }
 
     const clockInDate = new Date(clockIn);
+    const clockOutDate = clockOut ? new Date(clockOut) : null;
+
+    let totalHours = null;
+    if (clockOutDate) {
+      let duration = (clockOutDate.getTime() - clockInDate.getTime()) / (1000 * 60 * 60);
+      if (lunchOut && lunchIn) {
+        const lunchDuration =
+          (new Date(lunchIn).getTime() - new Date(lunchOut).getTime()) / (1000 * 60 * 60);
+        duration -= lunchDuration;
+      }
+      totalHours = Math.max(0, Math.round(duration * 100) / 100);
+    }
+
     const entry = await prisma.timeEntry.create({
       data: {
         workerId,
         clockIn: clockInDate,
+        lunchOut: lunchOut ? new Date(lunchOut) : null,
+        lunchIn: lunchIn ? new Date(lunchIn) : null,
+        clockOut: clockOutDate,
+        totalHours,
         date: getDateString(clockInDate),
       },
     });

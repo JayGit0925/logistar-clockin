@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { formatDateForDisplay, formatTimeOnly, formatDateOnly } from '@/lib/timezone';
-import { Trash2 } from 'lucide-react';
+import { formatTimeOnly, formatDateOnly } from '@/lib/timezone';
+import { Trash2, Pencil } from 'lucide-react';
 import { useLanguage } from '@/lib/language-context';
+import { EditTimeModal } from './edit-time-modal';
 import toast from 'react-hot-toast';
 
 interface TimeEntry {
@@ -25,17 +26,19 @@ interface TimeEntriesTableProps {
     startDate: string;
     endDate: string;
   };
+  refreshKey?: number;
 }
 
-export function TimeEntriesTable({ filters }: TimeEntriesTableProps) {
+export function TimeEntriesTable({ filters, refreshKey }: TimeEntriesTableProps) {
   const { t } = useLanguage();
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [totalHours, setTotalHours] = useState(0);
+  const [editingEntry, setEditingEntry] = useState<TimeEntry | null>(null);
 
   useEffect(() => {
     fetchEntries();
-  }, [filters]);
+  }, [filters, refreshKey]);
 
   const fetchEntries = async () => {
     setIsLoading(true);
@@ -108,8 +111,9 @@ export function TimeEntriesTable({ filters }: TimeEntriesTableProps) {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden">
-      <div className="overflow-x-auto">
+    <>
+      <div className="bg-white rounded-lg shadow-md overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
@@ -178,29 +182,52 @@ export function TimeEntriesTable({ filters }: TimeEntriesTableProps) {
                       : '-'}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm">
-                    <button
-                      onClick={() => handleDelete(entry.id)}
-                      className="text-red-600 hover:text-red-800 transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setEditingEntry(entry)}
+                        className="text-blue-600 hover:text-blue-800 transition-colors"
+                        title={t('editTime')}
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(entry.id)}
+                        className="text-red-600 hover:text-red-800 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
-      </div>
-      <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
-        <div className="flex justify-between items-center">
-          <span className="text-sm text-gray-600">
-            {t('totalEntries')}: {entries.length}
-          </span>
-          <span className="text-sm font-semibold text-gray-900">
-            {t('totalHours')}: {totalHours.toFixed(2)}
-          </span>
+        </div>
+        <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-gray-600">
+              {t('totalEntries')}: {entries.length}
+            </span>
+            <span className="text-sm font-semibold text-gray-900">
+              {t('totalHours')}: {totalHours.toFixed(2)}
+            </span>
+          </div>
         </div>
       </div>
-    </div>
+
+      {editingEntry && (
+        <EditTimeModal
+          entry={editingEntry}
+          onClose={() => setEditingEntry(null)}
+          onSaved={() => {
+            setEditingEntry(null);
+            fetchEntries();
+          }}
+        />
+      )}
+    </>
   );
 }
