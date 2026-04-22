@@ -19,16 +19,20 @@ model Worker {
 }
 
 model TimeEntry {
-  id         String    @id @default(uuid())
-  workerId   String
-  worker     Worker    @relation(fields: [workerId], references: [id], onDelete: Cascade)
-  clockIn    DateTime
-  lunchOut   DateTime?
-  lunchIn    DateTime?
-  clockOut   DateTime?
-  totalHours Float?
-  date       String
-  createdAt  DateTime  @default(now())
+  id                 String    @id @default(uuid())
+  workerId           String
+  worker             Worker    @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  clockIn            DateTime
+  lunchOut           DateTime?
+  lunchIn            DateTime?
+  clockOut           DateTime?
+  totalHours         Float?
+  date               String
+  createdAt          DateTime  @default(now())
+  clockInPhotoUrl    String?
+  lunchOutPhotoUrl   String?
+  lunchInPhotoUrl    String?
+  clockOutPhotoUrl   String?
 
   @@index([workerId])
   @@index([date])

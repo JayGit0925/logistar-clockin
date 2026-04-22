@@ -89,7 +89,7 @@ export async function PATCH(
 ) {
   try {
     const body = await request.json();
-    const { action, timestamp } = body;
+    const { action, timestamp, photoUrl } = body;
 
     if (!action || !timestamp) {
       return NextResponse.json(
@@ -115,12 +115,15 @@ export async function PATCH(
     switch (action) {
       case 'lunchOut':
         data.lunchOut = ts;
+        if (photoUrl) data.lunchOutPhotoUrl = photoUrl;
         break;
       case 'lunchIn':
         data.lunchIn = ts;
+        if (photoUrl) data.lunchInPhotoUrl = photoUrl;
         break;
       case 'shiftEnd': {
         data.clockOut = ts;
+        if (photoUrl) data.clockOutPhotoUrl = photoUrl;
         // Calculate total hours: (shiftEnd - shiftStart) - (lunchIn - lunchOut)
         const shiftMs = dayjs(ts).diff(dayjs(entry.clockIn));
         let lunchMs = 0;
@@ -137,6 +140,7 @@ export async function PATCH(
       // Legacy support: clockOut directly
       case 'clockOut':
         data.clockOut = ts;
+        if (photoUrl) data.clockOutPhotoUrl = photoUrl;
         const hours = dayjs(ts).diff(dayjs(entry.clockIn), 'hour', true);
         data.totalHours = Math.round(hours * 100) / 100;
         break;

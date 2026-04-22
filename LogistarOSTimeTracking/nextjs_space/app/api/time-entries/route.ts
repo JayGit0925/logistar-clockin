@@ -44,7 +44,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { workerId, clockIn, lunchOut, lunchIn, clockOut, force } = body;
+    const { workerId, clockIn, lunchOut, lunchIn, clockOut, force, clockInPhotoUrl } = body;
 
     if (!workerId || !clockIn) {
       return NextResponse.json(
@@ -90,6 +90,7 @@ export async function POST(request: Request) {
         clockOut: clockOutDate,
         totalHours,
         date: getDateString(clockInDate),
+        clockInPhotoUrl: clockInPhotoUrl || null,
       },
     });
 

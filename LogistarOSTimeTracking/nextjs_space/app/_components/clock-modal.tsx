@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { X, Clock, CheckCircle, Lock, Delete, Coffee, LogIn, LogOut, ArrowRight } from 'lucide-react';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { X, Clock, CheckCircle, Lock, Delete, Coffee, LogIn, LogOut } from 'lucide-react';
 import { getNowInET, formatTimeOnly } from '@/lib/timezone';
 import { useLanguage } from '@/lib/language-context';
 import toast from 'react-hot-toast';
@@ -28,6 +28,8 @@ interface ClockModalProps {
   onClose: () => void;
 }
 
+const INACTIVITY_SECONDS = 30;
+
 export function ClockModal({ worker, isOpen, onClose }: ClockModalProps) {
   const { t } = useLanguage();
   const [activeShift, setActiveShift] = useState<ActiveShift | null>(null);
@@ -38,6 +40,102 @@ export function ClockModal({ worker, isOpen, onClose }: ClockModalProps) {
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
+
+  // Camera refs — stream runs silently in background after PIN verified
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  // Inactivity timer refs
+  const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // ─── Camera ──────────────────────────────────────────────────────────────
+
+  const stopCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+  }, []);
+
+  const startCamera = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+    } catch (err) {
+      // Non-fatal — kiosk may deny camera; punch still proceeds
+      console.warn('Camera unavailable:', err);
+    }
+  }, []);
+
+  const captureAndUploadPhoto = useCallback(async (): Promise<string | null> => {
+    if (!videoRef.current || !canvasRef.current || !streamRef.current) return null;
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const base64 = canvas.toDataURL('image/jpeg', 0.8);
+    try {
+      const res = await fetch('/api/photos/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageBase64: base64, workerId: worker.id }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return data.url as string;
+      }
+    } catch (err) {
+      console.warn('Photo upload failed:', err);
+    }
+    return null;
+  }, [worker.id]);
+
+  // ─── Inactivity timer ─────────────────────────────────────────────────────
+
+  const clearInactivityTimer = useCallback(() => {
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+      inactivityTimerRef.current = null;
+    }
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
+    setCountdown(null);
+  }, []);
+
+  const resetInactivityTimer = useCallback(() => {
+    clearInactivityTimer();
+    let remaining = INACTIVITY_SECONDS;
+    setCountdown(remaining);
+
+    countdownIntervalRef.current = setInterval(() => {
+      remaining -= 1;
+      setCountdown(remaining);
+      if (remaining <= 0) {
+        if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+      }
+    }, 1000);
+
+    inactivityTimerRef.current = setTimeout(() => {
+      stopCamera();
+      onClose();
+    }, INACTIVITY_SECONDS * 1000);
+  }, [clearInactivityTimer, stopCamera, onClose]);
+
+  // ─── Lifecycle ────────────────────────────────────────────────────────────
 
   useEffect(() => {
     if (isOpen) {
@@ -46,14 +144,40 @@ export function ClockModal({ worker, isOpen, onClose }: ClockModalProps) {
       setPinError('');
       setActiveShift(null);
       setStep('none');
+      setCountdown(null);
+    } else {
+      stopCamera();
+      clearInactivityTimer();
     }
-  }, [isOpen, worker.id]);
+  }, [isOpen, worker.id, stopCamera, clearInactivityTimer]);
 
   useEffect(() => {
     if (pinVerified && isOpen) {
       checkActiveShift();
+      startCamera();
     }
-  }, [pinVerified, isOpen, worker.id]);
+  }, [pinVerified, isOpen, worker.id]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Start inactivity timer once we're on the action screen
+  useEffect(() => {
+    if (!pinVerified || isLoading || !isOpen) return;
+
+    resetInactivityTimer();
+
+    const reset = () => resetInactivityTimer();
+    window.addEventListener('pointermove', reset);
+    window.addEventListener('pointerdown', reset);
+    window.addEventListener('keydown', reset);
+
+    return () => {
+      window.removeEventListener('pointermove', reset);
+      window.removeEventListener('pointerdown', reset);
+      window.removeEventListener('keydown', reset);
+      clearInactivityTimer();
+    };
+  }, [pinVerified, isLoading, isOpen]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ─── API calls ───────────────────────────────────────────────────────────
 
   const handlePinDigit = (digit: string) => {
     if (pin.length < 4) {
@@ -115,16 +239,20 @@ export function ClockModal({ worker, isOpen, onClose }: ClockModalProps) {
   const handleShiftStart = async () => {
     setIsSubmitting(true);
     try {
+      const photoUrl = await captureAndUploadPhoto();
       const response = await fetch('/api/time-entries', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           workerId: worker.id,
           clockIn: getNowInET().toISOString(),
+          clockInPhotoUrl: photoUrl,
         }),
       });
       if (response.ok) {
         toast.success(`${worker.name} ${t('clockedInSuccess')}`);
+        stopCamera();
+        clearInactivityTimer();
         onClose();
       } else {
         const error = await response.json();
@@ -142,16 +270,20 @@ export function ClockModal({ worker, isOpen, onClose }: ClockModalProps) {
     if (!activeShift) return;
     setIsSubmitting(true);
     try {
+      const photoUrl = await captureAndUploadPhoto();
       const response = await fetch(`/api/time-entries/${activeShift.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action,
           timestamp: getNowInET().toISOString(),
+          photoUrl,
         }),
       });
       if (response.ok) {
         toast.success(`${worker.name} ${successMsg}`);
+        stopCamera();
+        clearInactivityTimer();
         onClose();
       } else {
         const error = await response.json();
@@ -196,8 +328,14 @@ export function ClockModal({ worker, isOpen, onClose }: ClockModalProps) {
   const stepLabels = [t('shiftStart'), t('lunchOut'), t('lunchIn'), t('shiftEnd')];
   const currentStepIndex = stepOrder.indexOf(step);
 
+  const showCountdown = countdown !== null && countdown <= 10;
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      {/* Hidden camera elements */}
+      <video ref={videoRef} className="hidden" autoPlay playsInline muted />
+      <canvas ref={canvasRef} className="hidden" />
+
       <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
         <div className="flex justify-between items-start mb-6">
           <div>
@@ -206,12 +344,23 @@ export function ClockModal({ worker, isOpen, onClose }: ClockModalProps) {
               <p className="text-sm text-gray-500 mt-1">{worker.employeeId}</p>
             )}
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <X className="w-6 h-6" />
-          </button>
+          <div className="flex items-center gap-2">
+            {showCountdown && (
+              <span className="text-xs text-orange-500 font-medium animate-pulse">
+                {countdown}s
+              </span>
+            )}
+            <button
+              onClick={() => {
+                stopCamera();
+                clearInactivityTimer();
+                onClose();
+              }}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
         </div>
 
         {!pinVerified ? (
@@ -280,6 +429,12 @@ export function ClockModal({ worker, isOpen, onClose }: ClockModalProps) {
         ) : step === 'none' ? (
           // No active shift → Shift Start
           <div>
+            {streamRef.current && (
+              <div className="flex items-center gap-1.5 mb-4 text-xs text-gray-400">
+                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                <span>Camera active</span>
+              </div>
+            )}
             <button
               onClick={handleShiftStart}
               disabled={isSubmitting}
@@ -291,7 +446,7 @@ export function ClockModal({ worker, isOpen, onClose }: ClockModalProps) {
                 <>
                   <Clock className="w-7 h-7" />
                   <span>{t('shiftStart')}</span>
-                </>  
+                </>
               )}
             </button>
           </div>
@@ -345,6 +500,13 @@ export function ClockModal({ worker, isOpen, onClose }: ClockModalProps) {
                 </>
               )}
             </div>
+
+            {streamRef.current && (
+              <div className="flex items-center gap-1.5 mb-3 text-xs text-gray-400">
+                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                <span>Camera active</span>
+              </div>
+            )}
 
             {/* Action button */}
             <button
