@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Shield, Download, Users, Clock, Plus } from 'lucide-react';
+import { Shield, Download, Users, Clock, Plus, FileSpreadsheet } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { TimeEntriesTable } from './_components/time-entries-table';
 import { Filters } from './_components/filters';
 import { AddTimeModal } from './_components/add-time-modal';
@@ -91,6 +92,41 @@ export default function AdminPage() {
       }
     } catch (error) {
       console.error('Error exporting CSV:', error);
+      toast.error(t('csvFailed'));
+    }
+  };
+
+  const handleExportExcel = async () => {
+    try {
+      const params = new URLSearchParams();
+      if (filters.workerId) params.append('workerId', filters.workerId);
+      if (filters.startDate) params.append('startDate', filters.startDate);
+      if (filters.endDate) params.append('endDate', filters.endDate);
+
+      const response = await fetch(`/api/time-entries?${params.toString()}`);
+      if (!response.ok) { toast.error(t('csvFailed')); return; }
+
+      const entries = await response.json();
+      const rows = entries.map((e: any) => ({
+        Worker: e.worker?.name ?? '',
+        'Employee ID': e.worker?.employeeId ?? '',
+        Date: e.clockIn ? e.clockIn.slice(0, 10) : '',
+        'Clock In': e.clockIn ? new Date(e.clockIn).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '',
+        'Lunch Out': e.lunchOut ? new Date(e.lunchOut).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '',
+        'Lunch In': e.lunchIn ? new Date(e.lunchIn).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '',
+        'Clock Out': e.clockOut ? new Date(e.clockOut).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '',
+        'Total Hours': e.totalHours ?? '',
+        'Overtime': (e.totalHours ?? 0) > 8 ? 'Yes' : '',
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(rows);
+      ws['!cols'] = [16, 12, 12, 10, 10, 10, 10, 12, 8].map((wch) => ({ wch }));
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Time Entries');
+      XLSX.writeFile(wb, `time-entries-${new Date().toISOString().slice(0, 10)}.xlsx`);
+      toast.success(t('csvExported'));
+    } catch (error) {
+      console.error('Error exporting Excel:', error);
       toast.error(t('csvFailed'));
     }
   };
@@ -202,6 +238,13 @@ export default function AdminPage() {
               >
                 <Download className="w-4 h-4" />
                 <span>{t('exportCsv')}</span>
+              </button>
+              <button
+                onClick={handleExportExcel}
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors"
+              >
+                <FileSpreadsheet className="w-4 h-4" />
+                <span>Excel</span>
               </button>
             </div>
           </div>

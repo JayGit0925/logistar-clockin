@@ -135,11 +135,18 @@ export async function PATCH(
         break;
       }
       // Legacy support: clockOut directly
-      case 'clockOut':
+      case 'clockOut': {
         data.clockOut = ts;
-        const hours = dayjs(ts).diff(dayjs(entry.clockIn), 'hour', true);
-        data.totalHours = Math.round(hours * 100) / 100;
+        const shiftMsLegacy = dayjs(ts).diff(dayjs(entry.clockIn));
+        let lunchMsLegacy = 0;
+        if (entry.lunchOut && entry.lunchIn) {
+          lunchMsLegacy = dayjs(entry.lunchIn).diff(dayjs(entry.lunchOut));
+        } else if (entry.lunchOut && !entry.lunchIn) {
+          lunchMsLegacy = dayjs(ts).diff(dayjs(entry.lunchOut));
+        }
+        data.totalHours = Math.round(((shiftMsLegacy - lunchMsLegacy) / (1000 * 60 * 60)) * 100) / 100;
         break;
+      }
       default:
         return NextResponse.json(
           { error: 'Invalid action' },

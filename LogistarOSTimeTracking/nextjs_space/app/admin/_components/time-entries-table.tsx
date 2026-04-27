@@ -34,6 +34,7 @@ export function TimeEntriesTable({ filters, refreshKey }: TimeEntriesTableProps)
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [totalHours, setTotalHours] = useState(0);
+  const [overtimeCount, setOvertimeCount] = useState(0);
   const [editingEntry, setEditingEntry] = useState<TimeEntry | null>(null);
 
   useEffect(() => {
@@ -53,10 +54,9 @@ export function TimeEntriesTable({ filters, refreshKey }: TimeEntriesTableProps)
         const data = await response.json();
         setEntries(data);
 
-        const total = data.reduce((sum: number, entry: TimeEntry) => {
-          return sum + (entry.totalHours || 0);
-        }, 0);
+        const total = data.reduce((sum: number, entry: TimeEntry) => sum + (entry.totalHours || 0), 0);
         setTotalHours(total);
+        setOvertimeCount(data.filter((e: TimeEntry) => (e.totalHours ?? 0) > 8).length);
       }
     } catch (error) {
       console.error('Error fetching entries:', error);
@@ -177,9 +177,16 @@ export function TimeEntriesTable({ filters, refreshKey }: TimeEntriesTableProps)
                     ) : '-'}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                    {entry.totalHours !== null
-                      ? `${entry.totalHours.toFixed(2)} hrs`
-                      : '-'}
+                    {entry.totalHours !== null ? (
+                      <div className="flex items-center gap-1.5">
+                        <span>{entry.totalHours.toFixed(2)} hrs</span>
+                        {entry.totalHours > 8 && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-orange-100 text-orange-700">
+                            OT
+                          </span>
+                        )}
+                      </div>
+                    ) : '-'}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm">
                     <div className="flex items-center gap-2">
@@ -207,10 +214,15 @@ export function TimeEntriesTable({ filters, refreshKey }: TimeEntriesTableProps)
         </table>
         </div>
         <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-center flex-wrap gap-2">
             <span className="text-sm text-gray-600">
               {t('totalEntries')}: {entries.length}
             </span>
+            {overtimeCount > 0 && (
+              <span className="text-sm font-medium text-orange-600">
+                OT entries: {overtimeCount}
+              </span>
+            )}
             <span className="text-sm font-semibold text-gray-900">
               {t('totalHours')}: {totalHours.toFixed(2)}
             </span>
