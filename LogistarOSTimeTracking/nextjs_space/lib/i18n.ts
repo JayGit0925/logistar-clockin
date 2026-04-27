@@ -5,6 +5,7 @@ export const translations = {
     // Main page
     appTitle: 'Time Tracker',
     tapToStart: 'Tap your name to start',
+    tapToClockIn: 'Tap to Clock In',
     adminDashboard: 'Admin Dashboard',
     noWorkers: 'No workers found. Please add workers in the admin dashboard.',
 
@@ -96,12 +97,25 @@ export const translations = {
     noWorkersYet: 'No workers found. Add your first worker to get started.',
     nameRequired: 'Name is required',
 
+    // Import
+    importTimeEntries: 'Import Time Entries',
+    selectExcelFile: 'Select an Excel file to import',
+    chooseFile: 'Choose File',
+    selectedFile: 'Selected file',
+    importWarning: 'Warning',
+    willOverwrite: 'This will overwrite existing entries for the selected dates',
+    selectDifferent: 'Select Different File',
+    importing: 'Importing...',
+    importNow: 'Import Now',
+    downloadTemplate: 'Download Template',
+
     // Language
     language: 'Language',
   },
   zh: {
     appTitle: '打卡系统',
     tapToStart: '点击你的名字开始打卡',
+    tapToClockIn: '点击打卡',
     adminDashboard: '管理后台',
     noWorkers: '暂无员工，请在管理后台添加。',
 
@@ -188,11 +202,23 @@ export const translations = {
     noWorkersYet: '暂无员工，请添加第一位员工。',
     nameRequired: '姓名为必填项',
 
+    importTimeEntries: '导入打卡记录',
+    selectExcelFile: '选择Excel文件导入',
+    chooseFile: '选择文件',
+    selectedFile: '已选择文件',
+    importWarning: '警告',
+    willOverwrite: '这将覆盖选定日期的现有记录',
+    selectDifferent: '选择其他文件',
+    importing: '导入中...',
+    importNow: '立即导入',
+    downloadTemplate: '下载模板',
+
     language: '语言',
   },
   es: {
     appTitle: 'Control de Tiempo',
     tapToStart: 'Toca tu nombre para comenzar',
+    tapToClockIn: 'Toca para fichar',
     adminDashboard: 'Panel de Admin',
     noWorkers: 'No se encontraron trabajadores. Agregue trabajadores en el panel de administración.',
 
@@ -278,6 +304,17 @@ export const translations = {
     newPinGenerated: 'Nuevo PIN generado para {name}',
     noWorkersYet: 'Sin trabajadores. Agregue el primero.',
     nameRequired: 'Nombre es requerido',
+
+    importTimeEntries: 'Importar Registros',
+    selectExcelFile: 'Seleccione archivo Excel para importar',
+    chooseFile: 'Elegir Archivo',
+    selectedFile: 'Archivo seleccionado',
+    importWarning: 'Advertencia',
+    willOverwrite: 'Esto sobrescribirá los registros existentes en las fechas seleccionadas',
+    selectDifferent: 'Seleccionar Otro Archivo',
+    importing: 'Importando...',
+    importNow: 'Importar Ahora',
+    downloadTemplate: 'Descargar Plantilla',
 
     language: 'Idioma',
   },

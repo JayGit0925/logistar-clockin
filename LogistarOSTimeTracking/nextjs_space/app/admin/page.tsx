@@ -6,6 +6,7 @@ import { Shield, Download, Users, Clock, Plus } from 'lucide-react';
 import { TimeEntriesTable } from './_components/time-entries-table';
 import { Filters } from './_components/filters';
 import { AddTimeModal } from './_components/add-time-modal';
+import { ImportTimeModal } from './_components/import-time-modal';
 import { LanguageSelector } from '@/components/language-selector';
 import { useLanguage } from '@/lib/language-context';
 import toast from 'react-hot-toast';
@@ -23,6 +24,7 @@ export default function AdminPage() {
     endDate: '',
   });
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
@@ -179,13 +181,20 @@ export default function AdminPage() {
               <Clock className="w-5 h-5 text-blue-600" />
               <h2 className="text-xl font-semibold text-gray-900">{t('timeEntries')}</h2>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <button
                 onClick={() => setShowAddModal(true)}
                 className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
               >
                 <Plus className="w-4 h-4" />
                 <span>{t('addEntry')}</span>
+              </button>
+              <button
+                onClick={() => setShowImportModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                <span>{t('importTimeEntries')}</span>
               </button>
               <button
                 onClick={handleExport}
@@ -207,6 +216,16 @@ export default function AdminPage() {
           onClose={() => setShowAddModal(false)}
           onSaved={() => {
             setShowAddModal(false);
+            setRefreshKey((k) => k + 1);
+          }}
+        />
+      )}
+
+      {showImportModal && (
+        <ImportTimeModal
+          onClose={() => setShowImportModal(false)}
+          onSaved={() => {
+            setShowImportModal(false);
             setRefreshKey((k) => k + 1);
           }}
         />

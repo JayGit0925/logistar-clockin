@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { X, Clock, CheckCircle, Lock, Delete, Coffee, LogIn, LogOut, ArrowRight } from 'lucide-react';
+import { X, Clock, Lock, Delete, Coffee, LogIn, LogOut } from 'lucide-react';
 import { getNowInET, formatTimeOnly } from '@/lib/timezone';
 import { useLanguage } from '@/lib/language-context';
 import toast from 'react-hot-toast';
@@ -23,16 +23,16 @@ interface ActiveShift {
 type ShiftStep = 'none' | 'shift_started' | 'at_lunch' | 'back_from_lunch' | 'completed';
 
 interface ClockModalProps {
-  worker: Worker;
   isOpen: boolean;
   onClose: () => void;
 }
 
-export function ClockModal({ worker, isOpen, onClose }: ClockModalProps) {
+export function ClockModal({ isOpen, onClose }: ClockModalProps) {
   const { t } = useLanguage();
+  const [resolvedWorker, setResolvedWorker] = useState<Worker | null>(null);
   const [activeShift, setActiveShift] = useState<ActiveShift | null>(null);
   const [step, setStep] = useState<ShiftStep>('none');
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pinVerified, setPinVerified] = useState(false);
   const [pin, setPin] = useState('');
@@ -44,16 +44,17 @@ export function ClockModal({ worker, isOpen, onClose }: ClockModalProps) {
       setPinVerified(false);
       setPin('');
       setPinError('');
+      setResolvedWorker(null);
       setActiveShift(null);
       setStep('none');
     }
-  }, [isOpen, worker.id]);
+  }, [isOpen]);
 
   useEffect(() => {
-    if (pinVerified && isOpen) {
-      checkActiveShift();
+    if (pinVerified && resolvedWorker) {
+      checkActiveShift(resolvedWorker.id);
     }
-  }, [pinVerified, isOpen, worker.id]);
+  }, [pinVerified, resolvedWorker]);
 
   const handlePinDigit = (digit: string) => {
     if (pin.length < 4) {
@@ -74,21 +75,22 @@ export function ClockModal({ worker, isOpen, onClose }: ClockModalProps) {
   const verifyPin = async (enteredPin: string) => {
     setIsVerifying(true);
     try {
-      const response = await fetch('/api/workers/verify-pin', {
+      const response = await fetch('/api/workers/identify-by-pin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workerId: worker.id, pin: enteredPin }),
+        body: JSON.stringify({ pin: enteredPin }),
       });
 
       if (response.ok) {
+        const worker = await response.json();
+        setResolvedWorker(worker);
         setPinVerified(true);
-        setPinError('');
       } else {
-        setPinError(t('incorrectPin'));
+        const data = await response.json();
+        setPinError(response.status === 409 ? data.error : t('incorrectPin'));
         setPin('');
       }
-    } catch (error) {
-      console.error('Error verifying PIN:', error);
+    } catch {
       setPinError(t('verificationFailed'));
       setPin('');
     } finally {
@@ -96,79 +98,61 @@ export function ClockModal({ worker, isOpen, onClose }: ClockModalProps) {
     }
   };
 
-  const checkActiveShift = async () => {
+  const checkActiveShift = async (workerId: string) => {
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/time-entries/active?workerId=${worker.id}`);
+      const response = await fetch(`/api/time-entries/active?workerId=${workerId}`);
       if (response.ok) {
         const data = await response.json();
         setActiveShift(data.activeShift);
         setStep(data.step);
       }
-    } catch (error) {
-      console.error('Error checking active shift:', error);
+    } catch {
+      // silent — shift defaults to 'none'
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleShiftStart = async () => {
+  const runPunch = async (url: string, options: RequestInit, successMsg: string) => {
     setIsSubmitting(true);
     try {
-      const response = await fetch('/api/time-entries', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          workerId: worker.id,
-          clockIn: getNowInET().toISOString(),
-        }),
-      });
+      const response = await fetch(url, options);
       if (response.ok) {
-        toast.success(`${worker.name} ${t('clockedInSuccess')}`);
+        toast.success(`${resolvedWorker!.name} ${successMsg}`);
         onClose();
       } else {
         const error = await response.json();
         toast.error(error.error || t('failedAction'));
       }
-    } catch (error) {
-      console.error('Error:', error);
+    } catch {
       toast.error(t('failedAction'));
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handlePunch = async (action: string, successMsg: string) => {
-    if (!activeShift) return;
-    setIsSubmitting(true);
-    try {
-      const response = await fetch(`/api/time-entries/${activeShift.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action,
-          timestamp: getNowInET().toISOString(),
-        }),
-      });
-      if (response.ok) {
-        toast.success(`${worker.name} ${successMsg}`);
-        onClose();
-      } else {
-        const error = await response.json();
-        toast.error(error.error || t('failedAction'));
-      }
-    } catch (error) {
-      console.error('Error:', error);
-      toast.error(t('failedAction'));
-    } finally {
-      setIsSubmitting(false);
-    }
+  const handleShiftStart = () => {
+    if (!resolvedWorker) return;
+    runPunch(
+      '/api/time-entries',
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ workerId: resolvedWorker.id, clockIn: getNowInET().toISOString() }) },
+      t('clockedInSuccess')
+    );
+  };
+
+  const handlePunch = (action: string, successMsg: string) => {
+    if (!activeShift || !resolvedWorker) return;
+    runPunch(
+      `/api/time-entries/${activeShift.id}`,
+      { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, timestamp: getNowInET().toISOString() }) },
+      successMsg
+    );
   };
 
   if (!isOpen) return null;
 
-  // Step config for button rendering
-  const stepConfig: Record<string, { label: string; color: string; icon: any; action: () => void }> = {
+  const stepConfig: Record<string, { label: string; color: string; icon: React.ElementType; action: () => void }> = {
     shift_started: {
       label: t('lunchOut'),
       color: 'bg-orange-500 hover:bg-orange-600',
@@ -191,7 +175,6 @@ export function ClockModal({ worker, isOpen, onClose }: ClockModalProps) {
 
   const currentStepConfig = step !== 'none' && step !== 'completed' ? stepConfig[step] : null;
 
-  // Progress indicator
   const stepOrder: ShiftStep[] = ['shift_started', 'at_lunch', 'back_from_lunch', 'completed'];
   const stepLabels = [t('shiftStart'), t('lunchOut'), t('lunchIn'), t('shiftEnd')];
   const currentStepIndex = stepOrder.indexOf(step);
@@ -201,15 +184,14 @@ export function ClockModal({ worker, isOpen, onClose }: ClockModalProps) {
       <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
         <div className="flex justify-between items-start mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">{worker.name}</h2>
-            {worker.employeeId && (
-              <p className="text-sm text-gray-500 mt-1">{worker.employeeId}</p>
+            <h2 className="text-2xl font-bold text-gray-900">
+              {resolvedWorker ? resolvedWorker.name : t('enterPin')}
+            </h2>
+            {resolvedWorker?.employeeId && (
+              <p className="text-sm text-gray-500 mt-1">{resolvedWorker.employeeId}</p>
             )}
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
             <X className="w-6 h-6" />
           </button>
         </div>
@@ -220,7 +202,6 @@ export function ClockModal({ worker, isOpen, onClose }: ClockModalProps) {
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
                 <Lock className="w-8 h-8 text-blue-600" />
               </div>
-              <p className="text-gray-600 text-lg">{t('enterPin')}</p>
             </div>
 
             <div className="flex justify-center gap-4 mb-6">
@@ -278,7 +259,6 @@ export function ClockModal({ worker, isOpen, onClose }: ClockModalProps) {
             <p className="text-gray-500 mt-4">{t('loading')}</p>
           </div>
         ) : step === 'none' ? (
-          // No active shift → Shift Start
           <div>
             <button
               onClick={handleShiftStart}
@@ -291,14 +271,12 @@ export function ClockModal({ worker, isOpen, onClose }: ClockModalProps) {
                 <>
                   <Clock className="w-7 h-7" />
                   <span>{t('shiftStart')}</span>
-                </>  
+                </>
               )}
             </button>
           </div>
         ) : currentStepConfig ? (
-          // Active shift → show status + next action
           <div>
-            {/* Progress dots */}
             <div className="flex items-center justify-center gap-2 mb-5">
               {stepLabels.map((label, i) => (
                 <div key={i} className="flex items-center gap-2">
@@ -321,7 +299,6 @@ export function ClockModal({ worker, isOpen, onClose }: ClockModalProps) {
               ))}
             </div>
 
-            {/* Current shift info */}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4 space-y-1">
               <div className="flex items-center gap-2 mb-1">
                 <Clock className="w-4 h-4 text-blue-600" />
@@ -346,7 +323,6 @@ export function ClockModal({ worker, isOpen, onClose }: ClockModalProps) {
               )}
             </div>
 
-            {/* Action button */}
             <button
               onClick={currentStepConfig.action}
               disabled={isSubmitting}

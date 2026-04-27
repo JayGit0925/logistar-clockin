@@ -1,19 +1,12 @@
-import { prisma } from '@/lib/prisma';
 import { WorkerGrid } from './_components/worker-grid';
 import { HomeHeader } from './_components/home-header';
 
-export const dynamic = 'force-dynamic';
-
-export default async function HomePage() {
-  const workers = await prisma.worker.findMany({
-    orderBy: { name: 'asc' },
-  });
-
+export default function HomePage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100">
       <div className="container mx-auto px-4 py-8 max-w-6xl">
         <HomeHeader />
-        <WorkerGrid workers={workers} />
+        <WorkerGrid />
         <div className="mt-8 text-center">
           <a
             href="/admin"
