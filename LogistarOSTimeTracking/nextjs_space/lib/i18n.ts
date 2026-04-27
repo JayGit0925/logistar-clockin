@@ -108,6 +108,9 @@ export const translations = {
     importing: 'Importing...',
     importNow: 'Import Now',
     downloadTemplate: 'Download Template',
+    shiftSummary: "Today's Summary",
+    totalHoursWorked: 'Total Hours Worked',
+    confirmShift: 'Looks Good!',
 
     // Language
     language: 'Language',
@@ -212,6 +215,9 @@ export const translations = {
     importing: '导入中...',
     importNow: '立即导入',
     downloadTemplate: '下载模板',
+    shiftSummary: '今日工时汇总',
+    totalHoursWorked: '实际工时',
+    confirmShift: '确认',
 
     language: '语言',
   },
@@ -315,6 +321,9 @@ export const translations = {
     importing: 'Importando...',
     importNow: 'Importar Ahora',
     downloadTemplate: 'Descargar Plantilla',
+    shiftSummary: 'Resumen de Hoy',
+    totalHoursWorked: 'Horas Trabajadas',
+    confirmShift: '¡Confirmar!',
 
     language: 'Idioma',
   },

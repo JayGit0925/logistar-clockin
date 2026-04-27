@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { X, Clock, Lock, Delete, Coffee, LogIn, LogOut } from 'lucide-react';
+import { X, Clock, Lock, Delete, Coffee, LogIn, LogOut, CheckCircle } from 'lucide-react';
 import { getNowInET, formatTimeOnly } from '@/lib/timezone';
 import { useLanguage } from '@/lib/language-context';
 import toast from 'react-hot-toast';
@@ -18,6 +18,15 @@ interface ActiveShift {
   lunchOut: string | null;
   lunchIn: string | null;
   clockOut: string | null;
+}
+
+interface ShiftSummary {
+  date: string;
+  clockIn: string;
+  lunchOut: string | null;
+  lunchIn: string | null;
+  clockOut: string;
+  totalHours: number;
 }
 
 type ShiftStep = 'none' | 'shift_started' | 'at_lunch' | 'back_from_lunch' | 'completed';
@@ -38,6 +47,7 @@ export function ClockModal({ isOpen, onClose }: ClockModalProps) {
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
+  const [shiftSummary, setShiftSummary] = useState<ShiftSummary | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -47,6 +57,7 @@ export function ClockModal({ isOpen, onClose }: ClockModalProps) {
       setResolvedWorker(null);
       setActiveShift(null);
       setStep('none');
+      setShiftSummary(null);
     }
   }, [isOpen]);
 
@@ -150,6 +161,36 @@ export function ClockModal({ isOpen, onClose }: ClockModalProps) {
     );
   };
 
+  const handleShiftEnd = async () => {
+    if (!activeShift || !resolvedWorker) return;
+    setIsSubmitting(true);
+    try {
+      const response = await fetch(`/api/time-entries/${activeShift.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'shiftEnd', timestamp: getNowInET().toISOString() }),
+      });
+      if (response.ok) {
+        const entry = await response.json();
+        setShiftSummary({
+          date: entry.date,
+          clockIn: entry.clockIn,
+          lunchOut: entry.lunchOut ?? null,
+          lunchIn: entry.lunchIn ?? null,
+          clockOut: entry.clockOut,
+          totalHours: entry.totalHours ?? 0,
+        });
+      } else {
+        const error = await response.json();
+        toast.error(error.error || t('failedAction'));
+      }
+    } catch {
+      toast.error(t('failedAction'));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   const stepConfig: Record<string, { label: string; color: string; icon: React.ElementType; action: () => void }> = {
@@ -169,7 +210,7 @@ export function ClockModal({ isOpen, onClose }: ClockModalProps) {
       label: t('shiftEnd'),
       color: 'bg-red-600 hover:bg-red-700',
       icon: LogOut,
-      action: () => handlePunch('shiftEnd', t('clockedOutSuccess')),
+      action: handleShiftEnd,
     },
   };
 
@@ -185,9 +226,9 @@ export function ClockModal({ isOpen, onClose }: ClockModalProps) {
         <div className="flex justify-between items-start mb-6">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">
-              {resolvedWorker ? resolvedWorker.name : t('enterPin')}
+              {shiftSummary ? t('shiftSummary') : resolvedWorker ? resolvedWorker.name : t('enterPin')}
             </h2>
-            {resolvedWorker?.employeeId && (
+            {!shiftSummary && resolvedWorker?.employeeId && (
               <p className="text-sm text-gray-500 mt-1">{resolvedWorker.employeeId}</p>
             )}
           </div>
@@ -196,7 +237,48 @@ export function ClockModal({ isOpen, onClose }: ClockModalProps) {
           </button>
         </div>
 
-        {!pinVerified ? (
+        {shiftSummary ? (
+          <div>
+            <div className="flex flex-col items-center mb-6">
+              <CheckCircle className="w-16 h-16 text-green-500 mb-2" />
+              <p className="text-gray-500 text-sm">{shiftSummary.date}</p>
+            </div>
+
+            <div className="bg-gray-50 rounded-xl p-4 space-y-3 mb-4">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">{t('shiftStart')}</span>
+                <span className="font-medium text-gray-800">{formatTimeOnly(shiftSummary.clockIn)}</span>
+              </div>
+              {shiftSummary.lunchOut && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">{t('lunchOut')}</span>
+                  <span className="font-medium text-orange-600">{formatTimeOnly(shiftSummary.lunchOut)}</span>
+                </div>
+              )}
+              {shiftSummary.lunchIn && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">{t('lunchIn')}</span>
+                  <span className="font-medium text-green-600">{formatTimeOnly(shiftSummary.lunchIn)}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">{t('shiftEnd')}</span>
+                <span className="font-medium text-gray-800">{formatTimeOnly(shiftSummary.clockOut)}</span>
+              </div>
+              <div className="border-t border-gray-200 pt-3 flex justify-between items-center">
+                <span className="font-semibold text-gray-700">{t('totalHoursWorked')}</span>
+                <span className="text-2xl font-bold text-blue-600">{shiftSummary.totalHours.toFixed(2)}h</span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => { toast.success(`${resolvedWorker!.name} ${t('clockedOutSuccess')}`); onClose(); }}
+              className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-4 px-6 rounded-xl transition-colors text-lg"
+            >
+              {t('confirmShift')}
+            </button>
+          </div>
+        ) : !pinVerified ? (
           <div>
             <div className="text-center mb-6">
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
