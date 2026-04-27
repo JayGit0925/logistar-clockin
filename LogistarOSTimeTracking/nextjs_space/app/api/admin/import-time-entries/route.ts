@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     }
 
     const workers = await prisma.worker.findMany();
-    const workerMap = new Map(workers.map((w) => [w.name.toLowerCase(), w.id]));
+    const workerMap = new Map(workers.map((w) => [w.name.trim().toLowerCase(), w.id]));
 
     let importedCount = 0;
     const errors: string[] = [];

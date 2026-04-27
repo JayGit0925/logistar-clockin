@@ -34,6 +34,7 @@ export function ImportTimeModal({ onClose, onSaved }: ImportTimeModalProps) {
   const [isImporting, setIsImporting] = useState(false);
   const [preview, setPreview] = useState<ImportRow[]>([]);
   const [fileName, setFileName] = useState('');
+  const [importErrors, setImportErrors] = useState<string[]>([]);
 
   const handleDownloadTemplate = () => {
     const wb = XLSX.utils.book_new();
@@ -114,12 +115,16 @@ export function ImportTimeModal({ onClose, onSaved }: ImportTimeModalProps) {
     if (!timeVal || !dateStr) return '';
 
     if (typeof timeVal === 'string') {
-      const d = dayjs.tz(`${dateStr} ${timeVal}`, 'YYYY-MM-DD HH:mm', TIMEZONE);
-      if (d.isValid()) return d.toISOString();
+      // Try with seconds first (H:mm:ss), then without (H:mm)
+      const withSec = dayjs.tz(`${dateStr} ${timeVal}`, 'YYYY-MM-DD H:mm:ss', TIMEZONE);
+      if (withSec.isValid()) return withSec.toISOString();
+      const noSec = dayjs.tz(`${dateStr} ${timeVal}`, 'YYYY-MM-DD H:mm', TIMEZONE);
+      if (noSec.isValid()) return noSec.toISOString();
     } else if (typeof timeVal === 'number') {
-      const hours = Math.floor(timeVal * 24);
-      const minutes = Math.floor((timeVal * 24 - hours) * 60);
-      const d = dayjs.tz(`${dateStr} ${hours}:${minutes}`, 'YYYY-MM-DD HH:mm', TIMEZONE);
+      const totalMinutes = Math.round(timeVal * 24 * 60);
+      const hours = Math.floor(totalMinutes / 60);
+      const minutes = totalMinutes % 60;
+      const d = dayjs.tz(`${dateStr} ${hours}:${minutes}`, 'YYYY-MM-DD H:mm', TIMEZONE);
       if (d.isValid()) return d.toISOString();
     }
     return '';
@@ -144,8 +149,12 @@ export function ImportTimeModal({ onClose, onSaved }: ImportTimeModalProps) {
 
       if (response.ok) {
         const result = await response.json();
-        toast.success(`Imported ${result.count} entries successfully`);
-        onSaved();
+        toast.success(`Imported ${result.count} of ${result.total} entries`);
+        if (result.errors?.length) {
+          setImportErrors(result.errors);
+        } else {
+          onSaved();
+        }
       } else {
         const data = await response.json();
         toast.error(data.error || 'Import failed');
@@ -251,6 +260,18 @@ export function ImportTimeModal({ onClose, onSaved }: ImportTimeModalProps) {
               <p className="text-xs text-blue-600 bg-blue-50 p-3 rounded">
                 {t('importWarning')}: {t('willOverwrite')}
               </p>
+              {importErrors.length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                  <p className="text-xs font-semibold text-red-700 mb-2">
+                    {importErrors.length} row(s) failed — worker names must match exactly:
+                  </p>
+                  <ul className="space-y-1">
+                    {importErrors.map((err, i) => (
+                      <li key={i} className="text-xs text-red-600">{err}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -262,6 +283,7 @@ export function ImportTimeModal({ onClose, onSaved }: ImportTimeModalProps) {
               onClick={() => {
                 setPreview([]);
                 setFileName('');
+                setImportErrors([]);
                 if (fileInputRef.current) fileInputRef.current.value = '';
               }}
               className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
