@@ -12,6 +12,7 @@ model Worker {
   name        String
   employeeId  String?
   pin         String      @default("")
+  paidLunch   Boolean     @default(false)
   createdAt   DateTime    @default(now())
   timeEntries TimeEntry[]
 
