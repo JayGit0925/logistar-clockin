@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getDateString } from '@/lib/timezone';
+import { calculateTotalHours, applyPaidLunchStamps } from '@/lib/total-hours';
 
 export const dynamic = 'force-dynamic';
 
@@ -69,24 +70,40 @@ export async function POST(request: Request) {
 
     const clockInDate = new Date(clockIn);
     const clockOutDate = clockOut ? new Date(clockOut) : null;
+    const lunchOutDate = lunchOut ? new Date(lunchOut) : null;
+    const lunchInDate = lunchIn ? new Date(lunchIn) : null;
 
-    let totalHours = null;
-    if (clockOutDate) {
-      let duration = (clockOutDate.getTime() - clockInDate.getTime()) / (1000 * 60 * 60);
-      if (lunchOut && lunchIn) {
-        const lunchDuration =
-          (new Date(lunchIn).getTime() - new Date(lunchOut).getTime()) / (1000 * 60 * 60);
-        duration -= lunchDuration;
-      }
-      totalHours = Math.max(0, Math.round(duration * 100) / 100);
+    const worker = await prisma.worker.findUnique({ where: { id: workerId } });
+    if (!worker) {
+      return NextResponse.json({ error: 'Worker not found' }, { status: 404 });
     }
+
+    let finalLunchOut = lunchOutDate;
+    let finalLunchIn = lunchInDate;
+    if (worker.paidLunch && clockOutDate) {
+      const stamps = applyPaidLunchStamps({
+        clockIn: clockInDate,
+        clockOut: clockOutDate,
+        paidLunch: true,
+      });
+      finalLunchOut = stamps.lunchOut;
+      finalLunchIn = stamps.lunchIn;
+    }
+
+    const totalHours = calculateTotalHours({
+      clockIn: clockInDate,
+      clockOut: clockOutDate,
+      lunchOut: finalLunchOut,
+      lunchIn: finalLunchIn,
+      paidLunch: worker.paidLunch,
+    });
 
     const entry = await prisma.timeEntry.create({
       data: {
         workerId,
         clockIn: clockInDate,
-        lunchOut: lunchOut ? new Date(lunchOut) : null,
-        lunchIn: lunchIn ? new Date(lunchIn) : null,
+        lunchOut: finalLunchOut,
+        lunchIn: finalLunchIn,
         clockOut: clockOutDate,
         totalHours,
         date: getDateString(clockInDate),

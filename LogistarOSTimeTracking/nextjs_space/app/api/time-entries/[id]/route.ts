@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import dayjs from 'dayjs';
 import timezone from 'dayjs/plugin/timezone';
 import utc from 'dayjs/plugin/utc';
+import { calculateTotalHours, applyPaidLunchStamps } from '@/lib/total-hours';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -35,6 +36,28 @@ export async function PUT(
       );
     }
 
+    const worker = await prisma.worker.findUnique({
+      where: { id: entry.workerId },
+    });
+    if (!worker) {
+      return NextResponse.json({ error: 'Worker not found' }, { status: 404 });
+    }
+
+    const clockInDate = new Date(clockIn);
+    const clockOutDate = clockOut ? new Date(clockOut) : null;
+    let lunchOutDate = lunchOut ? new Date(lunchOut) : null;
+    let lunchInDate = lunchIn ? new Date(lunchIn) : null;
+
+    if (worker.paidLunch && clockOutDate) {
+      const stamps = applyPaidLunchStamps({
+        clockIn: clockInDate,
+        clockOut: clockOutDate,
+        paidLunch: true,
+      });
+      lunchOutDate = stamps.lunchOut;
+      lunchInDate = stamps.lunchIn;
+    }
+
     const data: {
       clockIn: Date;
       lunchOut: Date | null;
@@ -43,25 +66,19 @@ export async function PUT(
       totalHours: number | null;
       date: string;
     } = {
-      clockIn: new Date(clockIn),
-      lunchOut: lunchOut ? new Date(lunchOut) : null,
-      lunchIn: lunchIn ? new Date(lunchIn) : null,
-      clockOut: clockOut ? new Date(clockOut) : null,
-      totalHours: null,
+      clockIn: clockInDate,
+      lunchOut: lunchOutDate,
+      lunchIn: lunchInDate,
+      clockOut: clockOutDate,
+      totalHours: calculateTotalHours({
+        clockIn: clockInDate,
+        clockOut: clockOutDate,
+        lunchOut: lunchOutDate,
+        lunchIn: lunchInDate,
+        paidLunch: worker.paidLunch,
+      }),
       date: dayjs(clockIn).tz('America/New_York').format('YYYY-MM-DD'),
     };
-
-    if (clockOut) {
-      const shiftMs = dayjs(clockOut).diff(dayjs(clockIn));
-      let lunchMs = 0;
-      if (lunchOut && lunchIn) {
-        lunchMs = dayjs(lunchIn).diff(dayjs(lunchOut));
-      } else if (lunchOut && !lunchIn) {
-        lunchMs = dayjs(clockOut).diff(dayjs(lunchOut));
-      }
-      const totalMs = shiftMs - lunchMs;
-      data.totalHours = Math.round((totalMs / (1000 * 60 * 60)) * 100) / 100;
-    }
 
     const updatedEntry = await prisma.timeEntry.update({
       where: { id: params.id },
@@ -119,32 +136,35 @@ export async function PATCH(
       case 'lunchIn':
         data.lunchIn = ts;
         break;
-      case 'shiftEnd': {
-        data.clockOut = ts;
-        // Calculate total hours: (shiftEnd - shiftStart) - (lunchIn - lunchOut)
-        const shiftMs = dayjs(ts).diff(dayjs(entry.clockIn));
-        let lunchMs = 0;
-        if (entry.lunchOut && entry.lunchIn) {
-          lunchMs = dayjs(entry.lunchIn).diff(dayjs(entry.lunchOut));
-        } else if (entry.lunchOut && !entry.lunchIn) {
-          // Lunch out but never came back - treat current time as lunch in
-          lunchMs = dayjs(ts).diff(dayjs(entry.lunchOut));
-        }
-        const totalMs = shiftMs - lunchMs;
-        data.totalHours = Math.round((totalMs / (1000 * 60 * 60)) * 100) / 100;
-        break;
-      }
-      // Legacy support: clockOut directly
+      case 'shiftEnd':
       case 'clockOut': {
-        data.clockOut = ts;
-        const shiftMsLegacy = dayjs(ts).diff(dayjs(entry.clockIn));
-        let lunchMsLegacy = 0;
-        if (entry.lunchOut && entry.lunchIn) {
-          lunchMsLegacy = dayjs(entry.lunchIn).diff(dayjs(entry.lunchOut));
-        } else if (entry.lunchOut && !entry.lunchIn) {
-          lunchMsLegacy = dayjs(ts).diff(dayjs(entry.lunchOut));
+        const worker = await prisma.worker.findUnique({
+          where: { id: entry.workerId },
+        });
+        if (!worker) {
+          return NextResponse.json({ error: 'Worker not found' }, { status: 404 });
         }
-        data.totalHours = Math.round(((shiftMsLegacy - lunchMsLegacy) / (1000 * 60 * 60)) * 100) / 100;
+        data.clockOut = ts;
+        let lunchOut = entry.lunchOut;
+        let lunchIn = entry.lunchIn;
+        if (worker.paidLunch) {
+          const stamps = applyPaidLunchStamps({
+            clockIn: entry.clockIn,
+            clockOut: ts,
+            paidLunch: true,
+          });
+          lunchOut = stamps.lunchOut;
+          lunchIn = stamps.lunchIn;
+          data.lunchOut = lunchOut;
+          data.lunchIn = lunchIn;
+        }
+        data.totalHours = calculateTotalHours({
+          clockIn: entry.clockIn,
+          clockOut: ts,
+          lunchOut,
+          lunchIn,
+          paidLunch: worker.paidLunch,
+        });
         break;
       }
       default:

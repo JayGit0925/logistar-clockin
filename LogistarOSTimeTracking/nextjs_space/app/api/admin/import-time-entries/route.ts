@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getDateString } from '@/lib/timezone';
+import { calculateTotalHours, applyPaidLunchStamps } from '@/lib/total-hours';
 
 export const dynamic = 'force-dynamic';
 
@@ -67,27 +68,38 @@ export async function POST(request: Request) {
           });
         }
 
-        // Calculate total hours
-        let totalHours = null;
-        if (clockOutDate) {
-          let duration =
-            (clockOutDate.getTime() - clockInDate.getTime()) / (1000 * 60 * 60);
-          if (entry.lunchOut && entry.lunchIn) {
-            const lunchDuration =
-              (new Date(entry.lunchIn).getTime() -
-                new Date(entry.lunchOut).getTime()) /
-              (1000 * 60 * 60);
-            duration -= lunchDuration;
-          }
-          totalHours = Math.max(0, Math.round(duration * 100) / 100);
+        const worker = await prisma.worker.findUnique({ where: { id: workerId } });
+        if (!worker) {
+          errors.push(`Worker not found: ${workerName}`);
+          continue;
         }
+
+        let lunchOutDate = entry.lunchOut ? new Date(entry.lunchOut) : null;
+        let lunchInDate = entry.lunchIn ? new Date(entry.lunchIn) : null;
+        if (worker.paidLunch && clockOutDate) {
+          const stamps = applyPaidLunchStamps({
+            clockIn: clockInDate,
+            clockOut: clockOutDate,
+            paidLunch: true,
+          });
+          lunchOutDate = stamps.lunchOut;
+          lunchInDate = stamps.lunchIn;
+        }
+
+        const totalHours = calculateTotalHours({
+          clockIn: clockInDate,
+          clockOut: clockOutDate,
+          lunchOut: lunchOutDate,
+          lunchIn: lunchInDate,
+          paidLunch: worker.paidLunch,
+        });
 
         await prisma.timeEntry.create({
           data: {
             workerId,
             clockIn: clockInDate,
-            lunchOut: entry.lunchOut ? new Date(entry.lunchOut) : null,
-            lunchIn: entry.lunchIn ? new Date(entry.lunchIn) : null,
+            lunchOut: lunchOutDate,
+            lunchIn: lunchInDate,
             clockOut: clockOutDate,
             totalHours,
             date,
