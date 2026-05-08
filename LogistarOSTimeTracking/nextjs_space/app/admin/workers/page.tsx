@@ -12,6 +12,7 @@ interface Worker {
   name: string;
   employeeId: string | null;
   pin?: string;
+  paidLunch: boolean;
 }
 
 export default function WorkersPage() {
@@ -85,6 +86,31 @@ export default function WorkersPage() {
 
   const togglePinVisibility = (workerId: string) => {
     setShowPins({ ...showPins, [workerId]: !showPins[workerId] });
+  };
+
+  const handleTogglePaidLunch = async (worker: Worker) => {
+    const next = !worker.paidLunch;
+    setWorkers((prev) =>
+      prev.map((w) => (w.id === worker.id ? { ...w, paidLunch: next } : w))
+    );
+    try {
+      const response = await fetch(`/api/workers/${worker.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: worker.name,
+          employeeId: worker.employeeId,
+          paidLunch: next,
+        }),
+      });
+      if (!response.ok) throw new Error('failed');
+      toast.success(next ? t('paidLunchEnabled') : t('paidLunchDisabled'));
+    } catch {
+      setWorkers((prev) =>
+        prev.map((w) => (w.id === worker.id ? { ...w, paidLunch: !next } : w))
+      );
+      toast.error(t('failedAction'));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -221,6 +247,9 @@ export default function WorkersPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     {t('pin')}
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    {t('paidLunch')}
+                  </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     {t('actions')}
                   </th>
@@ -257,6 +286,23 @@ export default function WorkersPage() {
                           <RefreshCw className="w-4 h-4" />
                         </button>
                       </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <button
+                        type="button"
+                        onClick={() => handleTogglePaidLunch(worker)}
+                        aria-pressed={worker.paidLunch}
+                        title={t('paidLunchHint')}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          worker.paidLunch ? 'bg-blue-600' : 'bg-gray-300'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            worker.paidLunch ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
                       <div className="flex items-center justify-end gap-2">

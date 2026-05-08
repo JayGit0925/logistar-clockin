@@ -112,6 +112,12 @@ export const translations = {
     totalHoursWorked: 'Total Hours Worked',
     confirmShift: 'Looks Good!',
 
+    // Paid lunch
+    paidLunch: 'Paid Lunch',
+    paidLunchHint: 'Toggle paid lunch for this worker',
+    paidLunchEnabled: 'Paid lunch enabled',
+    paidLunchDisabled: 'Paid lunch disabled',
+
     // Language
     language: 'Language',
   },
@@ -219,6 +225,12 @@ export const translations = {
     totalHoursWorked: '实际工时',
     confirmShift: '确认',
 
+    // Paid lunch
+    paidLunch: '带薪午餐',
+    paidLunchHint: '切换此员工的带薪午餐',
+    paidLunchEnabled: '带薪午餐已启用',
+    paidLunchDisabled: '带薪午餐已禁用',
+
     language: '语言',
   },
   es: {
@@ -324,6 +336,12 @@ export const translations = {
     shiftSummary: 'Resumen de Hoy',
     totalHoursWorked: 'Horas Trabajadas',
     confirmShift: '¡Confirmar!',
+
+    // Paid lunch
+    paidLunch: 'Almuerzo Pagado',
+    paidLunchHint: 'Alternar almuerzo pagado para este trabajador',
+    paidLunchEnabled: 'Almuerzo pagado activado',
+    paidLunchDisabled: 'Almuerzo pagado desactivado',
 
     language: 'Idioma',
   },
