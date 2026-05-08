@@ -17,6 +17,7 @@ interface TimeEntry {
   worker: {
     name: string;
     employeeId: string | null;
+    paidLunch: boolean;
   };
 }
 
@@ -147,8 +148,13 @@ export function TimeEntriesTable({ filters, refreshKey }: TimeEntriesTableProps)
                 <tr key={entry.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 whitespace-nowrap">
                     <div>
-                      <div className="text-sm font-medium text-gray-900">
+                      <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
                         {entry.worker?.name}
+                        {entry.worker?.paidLunch && entry.lunchOut && entry.lunchIn && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-purple-100 text-purple-700">
+                            {t('paidLunchBadge')}
+                          </span>
+                        )}
                       </div>
                       {entry.worker?.employeeId && (
                         <div className="text-xs text-gray-500">

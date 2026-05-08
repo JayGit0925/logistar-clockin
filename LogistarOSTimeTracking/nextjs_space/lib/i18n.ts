@@ -117,6 +117,7 @@ export const translations = {
     paidLunchHint: 'Toggle paid lunch for this worker',
     paidLunchEnabled: 'Paid lunch enabled',
     paidLunchDisabled: 'Paid lunch disabled',
+    paidLunchBadge: 'Paid Lunch',
 
     // Language
     language: 'Language',
@@ -230,6 +231,7 @@ export const translations = {
     paidLunchHint: '切换此员工的带薪午餐',
     paidLunchEnabled: '带薪午餐已启用',
     paidLunchDisabled: '带薪午餐已禁用',
+    paidLunchBadge: '带薪午餐',
 
     language: '语言',
   },
@@ -342,6 +344,7 @@ export const translations = {
     paidLunchHint: 'Alternar almuerzo pagado para este trabajador',
     paidLunchEnabled: 'Almuerzo pagado activado',
     paidLunchDisabled: 'Almuerzo pagado desactivado',
+    paidLunchBadge: 'Almuerzo Pagado',
 
     language: 'Idioma',
   },
