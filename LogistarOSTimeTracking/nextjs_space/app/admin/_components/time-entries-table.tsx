@@ -6,6 +6,7 @@ import { Trash2, Pencil } from 'lucide-react';
 import { useLanguage } from '@/lib/language-context';
 import { EditTimeModal } from './edit-time-modal';
 import toast from 'react-hot-toast';
+import { usePaginatedEntries, PAGE_SIZE_OPTIONS } from '@/lib/use-paginated-entries';
 
 interface TimeEntry {
   id: string;
@@ -37,6 +38,9 @@ export function TimeEntriesTable({ filters, refreshKey }: TimeEntriesTableProps)
   const [totalHours, setTotalHours] = useState(0);
   const [overtimeCount, setOvertimeCount] = useState(0);
   const [editingEntry, setEditingEntry] = useState<TimeEntry | null>(null);
+
+  const { pageSize, setPageSize, page, setPage, pageEntries, totalPages } =
+    usePaginatedEntries(entries, JSON.stringify(filters));
 
   useEffect(() => {
     fetchEntries();
@@ -142,7 +146,7 @@ export function TimeEntriesTable({ filters, refreshKey }: TimeEntriesTableProps)
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {entries.map((entry: TimeEntry) => {
+            {pageEntries.map((entry: TimeEntry) => {
               const status = getStatus(entry);
               return (
                 <tr key={entry.id} className="hover:bg-gray-50">
@@ -220,18 +224,60 @@ export function TimeEntriesTable({ filters, refreshKey }: TimeEntriesTableProps)
         </table>
         </div>
         <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
-          <div className="flex justify-between items-center flex-wrap gap-2">
-            <span className="text-sm text-gray-600">
-              {t('totalEntries')}: {entries.length}
-            </span>
-            {overtimeCount > 0 && (
-              <span className="text-sm font-medium text-orange-600">
-                OT entries: {overtimeCount}
+          <div className="flex justify-between items-center flex-wrap gap-3">
+            <div className="flex items-center gap-3">
+              <label className="text-sm text-gray-600">{t('pageSize')}</label>
+              <select
+                value={String(pageSize)}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setPageSize(v === 'all' ? 'all' : (Number(v) as 20 | 50 | 100));
+                }}
+                className="px-2 py-1 border border-gray-300 rounded text-sm bg-white"
+              >
+                {PAGE_SIZE_OPTIONS.map((opt) => (
+                  <option key={String(opt)} value={String(opt)}>
+                    {opt === 'all' ? t('all') : opt}
+                  </option>
+                ))}
+              </select>
+              <span className="text-sm text-gray-600">
+                {t('totalEntries')}: {entries.length}
               </span>
-            )}
-            <span className="text-sm font-semibold text-gray-900">
-              {t('totalHours')}: {totalHours.toFixed(2)}
-            </span>
+            </div>
+            <div className="flex items-center gap-3">
+              {pageSize !== 'all' && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setPage(Math.max(1, page - 1))}
+                    disabled={page <= 1}
+                    className="px-3 py-1 text-sm bg-white border border-gray-300 rounded disabled:opacity-50"
+                  >
+                    {t('prev')}
+                  </button>
+                  <span className="text-sm text-gray-600">
+                    {t('page')} {page} / {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setPage(Math.min(totalPages, page + 1))}
+                    disabled={page >= totalPages}
+                    className="px-3 py-1 text-sm bg-white border border-gray-300 rounded disabled:opacity-50"
+                  >
+                    {t('next')}
+                  </button>
+                </>
+              )}
+              {overtimeCount > 0 && (
+                <span className="text-sm font-medium text-orange-600">
+                  OT entries: {overtimeCount}
+                </span>
+              )}
+              <span className="text-sm font-semibold text-gray-900">
+                {t('totalHours')}: {totalHours.toFixed(2)}
+              </span>
+            </div>
           </div>
         </div>
       </div>

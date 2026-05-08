@@ -119,6 +119,13 @@ export const translations = {
     paidLunchDisabled: 'Paid lunch disabled',
     paidLunchBadge: 'Paid Lunch',
 
+    // Pagination
+    pageSize: 'Page size',
+    prev: 'Prev',
+    next: 'Next',
+    page: 'Page',
+    all: 'All',
+
     // Language
     language: 'Language',
   },
@@ -233,6 +240,13 @@ export const translations = {
     paidLunchDisabled: '带薪午餐已禁用',
     paidLunchBadge: '带薪午餐',
 
+    // Pagination
+    pageSize: '每页',
+    prev: '上一页',
+    next: '下一页',
+    page: '第',
+    all: '全部',
+
     language: '语言',
   },
   es: {
@@ -345,6 +359,13 @@ export const translations = {
     paidLunchEnabled: 'Almuerzo pagado activado',
     paidLunchDisabled: 'Almuerzo pagado desactivado',
     paidLunchBadge: 'Almuerzo Pagado',
+
+    // Pagination
+    pageSize: 'Tamaño de página',
+    prev: 'Anterior',
+    next: 'Siguiente',
+    page: 'Página',
+    all: 'Todo',
 
     language: 'Idioma',
   },
