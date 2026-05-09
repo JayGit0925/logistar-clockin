@@ -10,6 +10,7 @@ interface Worker {
   id: string;
   name: string;
   employeeId: string | null;
+  paidLunch: boolean;
 }
 
 interface ActiveShift {
@@ -193,31 +194,46 @@ export function ClockModal({ isOpen, onClose }: ClockModalProps) {
 
   if (!isOpen) return null;
 
-  const stepConfig: Record<string, { label: string; color: string; icon: React.ElementType; action: () => void }> = {
-    shift_started: {
-      label: t('lunchOut'),
-      color: 'bg-orange-500 hover:bg-orange-600',
-      icon: Coffee,
-      action: () => handlePunch('lunchOut', t('lunchOutSuccess')),
-    },
-    at_lunch: {
-      label: t('lunchIn'),
-      color: 'bg-green-600 hover:bg-green-700',
-      icon: LogIn,
-      action: () => handlePunch('lunchIn', t('lunchInSuccess')),
-    },
-    back_from_lunch: {
-      label: t('shiftEnd'),
-      color: 'bg-red-600 hover:bg-red-700',
-      icon: LogOut,
-      action: handleShiftEnd,
-    },
-  };
+  const isPaidLunch = resolvedWorker?.paidLunch === true;
+
+  const stepConfig: Record<string, { label: string; color: string; icon: React.ElementType; action: () => void }> = isPaidLunch
+    ? {
+        shift_started: {
+          label: t('shiftEnd'),
+          color: 'bg-red-600 hover:bg-red-700',
+          icon: LogOut,
+          action: handleShiftEnd,
+        },
+      }
+    : {
+        shift_started: {
+          label: t('lunchOut'),
+          color: 'bg-orange-500 hover:bg-orange-600',
+          icon: Coffee,
+          action: () => handlePunch('lunchOut', t('lunchOutSuccess')),
+        },
+        at_lunch: {
+          label: t('lunchIn'),
+          color: 'bg-green-600 hover:bg-green-700',
+          icon: LogIn,
+          action: () => handlePunch('lunchIn', t('lunchInSuccess')),
+        },
+        back_from_lunch: {
+          label: t('shiftEnd'),
+          color: 'bg-red-600 hover:bg-red-700',
+          icon: LogOut,
+          action: handleShiftEnd,
+        },
+      };
 
   const currentStepConfig = step !== 'none' && step !== 'completed' ? stepConfig[step] : null;
 
-  const stepOrder: ShiftStep[] = ['shift_started', 'at_lunch', 'back_from_lunch', 'completed'];
-  const stepLabels = [t('shiftStart'), t('lunchOut'), t('lunchIn'), t('shiftEnd')];
+  const stepOrder: ShiftStep[] = isPaidLunch
+    ? ['shift_started', 'completed']
+    : ['shift_started', 'at_lunch', 'back_from_lunch', 'completed'];
+  const stepLabels = isPaidLunch
+    ? [t('shiftStart'), t('shiftEnd')]
+    : [t('shiftStart'), t('lunchOut'), t('lunchIn'), t('shiftEnd')];
   const currentStepIndex = stepOrder.indexOf(step);
 
   return (

@@ -13,7 +13,7 @@ export async function PATCH(
 ) {
   try {
     const body = await request.json();
-    const { name, employeeId, regeneratePin } = body;
+    const { name, employeeId, regeneratePin, paidLunch } = body;
 
     if (!name) {
       return NextResponse.json(
@@ -22,13 +22,16 @@ export async function PATCH(
       );
     }
 
-    const data: any = {
+    const data: { name: string; employeeId: string | null; pin?: string; paidLunch?: boolean } = {
       name,
       employeeId: employeeId || null,
     };
 
     if (regeneratePin) {
       data.pin = generatePin();
+    }
+    if (typeof paidLunch === 'boolean') {
+      data.paidLunch = paidLunch;
     }
 
     const worker = await prisma.worker.update({

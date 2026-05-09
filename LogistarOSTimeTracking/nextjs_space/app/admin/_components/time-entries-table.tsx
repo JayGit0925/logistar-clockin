@@ -6,6 +6,7 @@ import { Trash2, Pencil } from 'lucide-react';
 import { useLanguage } from '@/lib/language-context';
 import { EditTimeModal } from './edit-time-modal';
 import toast from 'react-hot-toast';
+import { usePaginatedEntries, PAGE_SIZE_OPTIONS } from '@/lib/use-paginated-entries';
 
 interface TimeEntry {
   id: string;
@@ -17,6 +18,7 @@ interface TimeEntry {
   worker: {
     name: string;
     employeeId: string | null;
+    paidLunch: boolean;
   };
 }
 
@@ -34,7 +36,11 @@ export function TimeEntriesTable({ filters, refreshKey }: TimeEntriesTableProps)
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [totalHours, setTotalHours] = useState(0);
+  const [overtimeCount, setOvertimeCount] = useState(0);
   const [editingEntry, setEditingEntry] = useState<TimeEntry | null>(null);
+
+  const { pageSize, setPageSize, page, setPage, pageEntries, totalPages } =
+    usePaginatedEntries(entries, JSON.stringify(filters));
 
   useEffect(() => {
     fetchEntries();
@@ -53,10 +59,9 @@ export function TimeEntriesTable({ filters, refreshKey }: TimeEntriesTableProps)
         const data = await response.json();
         setEntries(data);
 
-        const total = data.reduce((sum: number, entry: TimeEntry) => {
-          return sum + (entry.totalHours || 0);
-        }, 0);
+        const total = data.reduce((sum: number, entry: TimeEntry) => sum + (entry.totalHours || 0), 0);
         setTotalHours(total);
+        setOvertimeCount(data.filter((e: TimeEntry) => (e.totalHours ?? 0) > 8).length);
       }
     } catch (error) {
       console.error('Error fetching entries:', error);
@@ -141,14 +146,19 @@ export function TimeEntriesTable({ filters, refreshKey }: TimeEntriesTableProps)
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {entries.map((entry: TimeEntry) => {
+            {pageEntries.map((entry: TimeEntry) => {
               const status = getStatus(entry);
               return (
                 <tr key={entry.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 whitespace-nowrap">
                     <div>
-                      <div className="text-sm font-medium text-gray-900">
+                      <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
                         {entry.worker?.name}
+                        {entry.worker?.paidLunch && entry.lunchOut && entry.lunchIn && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-purple-100 text-purple-700">
+                            {t('paidLunchBadge')}
+                          </span>
+                        )}
                       </div>
                       {entry.worker?.employeeId && (
                         <div className="text-xs text-gray-500">
@@ -177,9 +187,16 @@ export function TimeEntriesTable({ filters, refreshKey }: TimeEntriesTableProps)
                     ) : '-'}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                    {entry.totalHours !== null
-                      ? `${entry.totalHours.toFixed(2)} hrs`
-                      : '-'}
+                    {entry.totalHours !== null ? (
+                      <div className="flex items-center gap-1.5">
+                        <span>{entry.totalHours.toFixed(2)} hrs</span>
+                        {entry.totalHours > 8 && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-orange-100 text-orange-700">
+                            OT
+                          </span>
+                        )}
+                      </div>
+                    ) : '-'}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm">
                     <div className="flex items-center gap-2">
@@ -207,13 +224,60 @@ export function TimeEntriesTable({ filters, refreshKey }: TimeEntriesTableProps)
         </table>
         </div>
         <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600">
-              {t('totalEntries')}: {entries.length}
-            </span>
-            <span className="text-sm font-semibold text-gray-900">
-              {t('totalHours')}: {totalHours.toFixed(2)}
-            </span>
+          <div className="flex justify-between items-center flex-wrap gap-3">
+            <div className="flex items-center gap-3">
+              <label className="text-sm text-gray-600">{t('pageSize')}</label>
+              <select
+                value={String(pageSize)}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setPageSize(v === 'all' ? 'all' : (Number(v) as 20 | 50 | 100));
+                }}
+                className="px-2 py-1 border border-gray-300 rounded text-sm bg-white"
+              >
+                {PAGE_SIZE_OPTIONS.map((opt) => (
+                  <option key={String(opt)} value={String(opt)}>
+                    {opt === 'all' ? t('all') : opt}
+                  </option>
+                ))}
+              </select>
+              <span className="text-sm text-gray-600">
+                {t('totalEntries')}: {entries.length}
+              </span>
+            </div>
+            <div className="flex items-center gap-3">
+              {pageSize !== 'all' && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setPage(Math.max(1, page - 1))}
+                    disabled={page <= 1}
+                    className="px-3 py-1 text-sm bg-white border border-gray-300 rounded disabled:opacity-50"
+                  >
+                    {t('prev')}
+                  </button>
+                  <span className="text-sm text-gray-600">
+                    {t('page')} {page} / {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setPage(Math.min(totalPages, page + 1))}
+                    disabled={page >= totalPages}
+                    className="px-3 py-1 text-sm bg-white border border-gray-300 rounded disabled:opacity-50"
+                  >
+                    {t('next')}
+                  </button>
+                </>
+              )}
+              {overtimeCount > 0 && (
+                <span className="text-sm font-medium text-orange-600">
+                  OT entries: {overtimeCount}
+                </span>
+              )}
+              <span className="text-sm font-semibold text-gray-900">
+                {t('totalHours')}: {totalHours.toFixed(2)}
+              </span>
+            </div>
           </div>
         </div>
       </div>

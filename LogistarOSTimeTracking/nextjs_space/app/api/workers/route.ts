@@ -19,6 +19,7 @@ export async function GET(request: Request) {
         name: true,
         employeeId: true,
         pin: includePin,
+        paidLunch: true,
         createdAt: true,
       },
     });

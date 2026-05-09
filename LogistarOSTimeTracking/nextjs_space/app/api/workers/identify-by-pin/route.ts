@@ -14,7 +14,7 @@ export async function POST(request: Request) {
 
     const workers = await prisma.worker.findMany({
       where: { pin },
-      select: { id: true, name: true, employeeId: true },
+      select: { id: true, name: true, employeeId: true, paidLunch: true },
     });
 
     if (workers.length === 0) {
