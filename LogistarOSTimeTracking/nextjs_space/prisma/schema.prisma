@@ -3,33 +3,48 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum PayType {
+  HOURLY
+  SALARY
 }
 
 model Worker {
-  id          String      @id @default(uuid())
-  name        String
-  employeeId  String?
-  pin         String      @default("")
-  paidLunch   Boolean     @default(false)
-  createdAt   DateTime    @default(now())
-  timeEntries TimeEntry[]
+  id           String      @id @default(uuid())
+  name         String
+  employeeId   String?
+  pin          String      @default("")
+  paidLunch    Boolean     @default(false)
+  company      String?
+  payType      PayType     @default(HOURLY)
+  hourlyRate   Decimal?    @db.Decimal(10, 2)
+  annualSalary Decimal?    @db.Decimal(12, 2)
+  createdAt    DateTime    @default(now())
+  timeEntries  TimeEntry[]
 
   @@index([name])
+  @@index([company])
 }
 
 model TimeEntry {
-  id         String    @id @default(uuid())
-  workerId   String
-  clockIn    DateTime
-  lunchOut   DateTime?
-  lunchIn    DateTime?
-  clockOut   DateTime?
-  totalHours Float?
-  date       String
-  createdAt  DateTime  @default(now())
-  worker     Worker    @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  id               String    @id @default(uuid())
+  workerId         String
+  clockIn          DateTime
+  lunchOut         DateTime?
+  lunchIn          DateTime?
+  clockOut         DateTime?
+  clockInPhotoUrl  String?
+  lunchOutPhotoUrl String?
+  lunchInPhotoUrl  String?
+  clockOutPhotoUrl String?
+  totalHours       Float?
+  date             String
+  createdAt        DateTime  @default(now())
+  worker           Worker    @relation(fields: [workerId], references: [id], onDelete: Cascade)
 
   @@index([workerId])
   @@index([date])

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { formatDateForDisplay } from '@/lib/timezone';
+import { buildTimeEntryCsv } from '@/lib/csv';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,39 +12,45 @@ export async function GET(request: Request) {
     const endDate = searchParams.get('endDate');
 
     const where: any = {};
-
-    if (workerId) {
-      where.workerId = workerId;
-    }
-
-    if (startDate && endDate) {
-      where.date = { gte: startDate, lte: endDate };
-    } else if (startDate) {
-      where.date = { gte: startDate };
-    } else if (endDate) {
-      where.date = { lte: endDate };
-    }
+    if (workerId) where.workerId = workerId;
+    if (startDate && endDate) where.date = { gte: startDate, lte: endDate };
+    else if (startDate) where.date = { gte: startDate };
+    else if (endDate) where.date = { lte: endDate };
 
     const entries = await prisma.timeEntry.findMany({
       where,
-      include: { worker: true },
+      include: {
+        worker: {
+          select: {
+            name: true,
+            employeeId: true,
+            company: true,
+            payType: true,
+            hourlyRate: true,
+            annualSalary: true,
+          },
+        },
+      },
       orderBy: { clockIn: 'desc' },
     });
 
-    const csvHeader = 'Worker Name,Employee ID,Shift Start,Lunch Out,Lunch In,Shift End,Total Hours\n';
-    const csvRows = entries.map((entry: any) => {
-      const workerName = entry.worker?.name || '';
-      const employeeId = entry.worker?.employeeId || '';
-      const shiftStart = formatDateForDisplay(entry.clockIn);
-      const lunchOut = entry.lunchOut ? formatDateForDisplay(entry.lunchOut) : '';
-      const lunchIn = entry.lunchIn ? formatDateForDisplay(entry.lunchIn) : '';
-      const shiftEnd = entry.clockOut ? formatDateForDisplay(entry.clockOut) : 'Active';
-      const totalHours = entry.totalHours !== null ? entry.totalHours.toFixed(2) : '-';
-
-      return `"${workerName}","${employeeId}","${shiftStart}","${lunchOut}","${lunchIn}","${shiftEnd}","${totalHours}"`;
-    }).join('\n');
-
-    const csv = csvHeader + csvRows;
+    const csv = buildTimeEntryCsv(
+      entries.map((e) => ({
+        clockIn: e.clockIn,
+        lunchOut: e.lunchOut,
+        lunchIn: e.lunchIn,
+        clockOut: e.clockOut,
+        totalHours: e.totalHours,
+        worker: {
+          name: e.worker.name,
+          employeeId: e.worker.employeeId,
+          company: e.worker.company,
+          payType: e.worker.payType,
+          hourlyRate: e.worker.hourlyRate?.toString() ?? null,
+          annualSalary: e.worker.annualSalary?.toString() ?? null,
+        },
+      }))
+    );
 
     return new NextResponse(csv, {
       headers: {
@@ -54,9 +60,6 @@ export async function GET(request: Request) {
     });
   } catch (error: any) {
     console.error('Error exporting CSV:', error);
-    return NextResponse.json(
-      { error: 'Failed to export CSV' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to export CSV' }, { status: 500 });
   }
 }

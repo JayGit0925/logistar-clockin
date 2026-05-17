@@ -13,6 +13,10 @@ interface Worker {
   employeeId: string | null;
   pin?: string;
   paidLunch: boolean;
+  company: string | null;
+  payType: 'HOURLY' | 'SALARY';
+  hourlyRate: string | null;
+  annualSalary: string | null;
 }
 
 export default function WorkersPage() {
@@ -25,9 +29,14 @@ export default function WorkersPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingWorker, setEditingWorker] = useState<Worker | null>(null);
   const [showPins, setShowPins] = useState<Record<string, boolean>>({});
+  const [companyFilter, setCompanyFilter] = useState<string>('');
   const [formData, setFormData] = useState({
     name: '',
     employeeId: '',
+    company: '',
+    payType: 'HOURLY' as 'HOURLY' | 'SALARY',
+    hourlyRate: '',
+    annualSalary: '',
   });
 
   useEffect(() => {
@@ -131,13 +140,24 @@ export default function WorkersPage() {
         body: JSON.stringify({
           name: formData.name,
           employeeId: formData.employeeId || null,
+          company: formData.company || null,
+          payType: formData.payType,
+          hourlyRate: formData.payType === 'HOURLY' ? formData.hourlyRate : null,
+          annualSalary: formData.payType === 'SALARY' ? formData.annualSalary : null,
         }),
       });
 
       if (response.ok) {
         toast.success(editingWorker ? t('workerUpdated') : t('workerAdded'));
         setShowModal(false);
-        setFormData({ name: '', employeeId: '' });
+        setFormData({
+          name: '',
+          employeeId: '',
+          company: '',
+          payType: 'HOURLY',
+          hourlyRate: '',
+          annualSalary: '',
+        });
         setEditingWorker(null);
         fetchWorkers();
       } else {
@@ -154,6 +174,10 @@ export default function WorkersPage() {
     setFormData({
       name: worker.name,
       employeeId: worker.employeeId || '',
+      company: worker.company || '',
+      payType: worker.payType,
+      hourlyRate: worker.hourlyRate || '',
+      annualSalary: worker.annualSalary || '',
     });
     setShowModal(true);
   };
@@ -180,9 +204,24 @@ export default function WorkersPage() {
 
   const handleAddNew = () => {
     setEditingWorker(null);
-    setFormData({ name: '', employeeId: '' });
+    setFormData({
+      name: '',
+      employeeId: '',
+      company: '',
+      payType: 'HOURLY',
+      hourlyRate: '',
+      annualSalary: '',
+    });
     setShowModal(true);
   };
+
+  const companies = Array.from(
+    new Set(workers.map((w) => w.company).filter((c): c is string => !!c))
+  ).sort();
+
+  const filteredWorkers = companyFilter
+    ? workers.filter((w) => w.company === companyFilter)
+    : workers;
 
   if (isChecking) {
     return (
@@ -210,6 +249,17 @@ export default function WorkersPage() {
               <h1 className="text-2xl font-bold text-gray-900">{t('manageWorkers')}</h1>
             </div>
             <div className="flex items-center gap-3">
+              <select
+                value={companyFilter}
+                onChange={(e) => setCompanyFilter(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                aria-label={t('filterByCompany')}
+              >
+                <option value="">{t('allCompanies')}</option>
+                {companies.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
               <LanguageSelector />
               <button
                 onClick={handleAddNew}
@@ -229,7 +279,7 @@ export default function WorkersPage() {
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
             <p className="text-gray-500 mt-4">{t('loading')}</p>
           </div>
-        ) : workers.length === 0 ? (
+        ) : filteredWorkers.length === 0 ? (
           <div className="bg-white rounded-lg shadow-md p-8 text-center">
             <p className="text-gray-500">{t('noWorkersYet')}</p>
           </div>
@@ -245,6 +295,12 @@ export default function WorkersPage() {
                     {t('employeeId')}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    {t('company')}
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    {t('payType')}
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     {t('pin')}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -256,7 +312,7 @@ export default function WorkersPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {workers.map((worker: Worker) => (
+                {filteredWorkers.map((worker: Worker) => (
                   <tr key={worker.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">{worker.name}</div>
@@ -264,6 +320,16 @@ export default function WorkersPage() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-500">
                         {worker.employeeId || '-'}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-700">{worker.company || '-'}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-700">
+                        {worker.payType === 'HOURLY'
+                          ? `${t('hourly')} · $${worker.hourlyRate ?? '-'}/hr`
+                          : `${t('salary')} · $${worker.annualSalary ?? '-'}/yr`}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -347,7 +413,7 @@ export default function WorkersPage() {
                   required
                 />
               </div>
-              <div className="mb-6">
+              <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   {t('employeeId')}
                 </label>
@@ -358,12 +424,93 @@ export default function WorkersPage() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {t('company')}
+                </label>
+                <input
+                  type="text"
+                  list="company-options"
+                  value={formData.company}
+                  onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                <datalist id="company-options">
+                  {companies.map((c) => <option key={c} value={c} />)}
+                </datalist>
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {t('payType')}
+                </label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="payType"
+                      value="HOURLY"
+                      checked={formData.payType === 'HOURLY'}
+                      onChange={() => setFormData({ ...formData, payType: 'HOURLY' })}
+                    />
+                    {t('hourly')}
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="payType"
+                      value="SALARY"
+                      checked={formData.payType === 'SALARY'}
+                      onChange={() => setFormData({ ...formData, payType: 'SALARY' })}
+                    />
+                    {t('salary')}
+                  </label>
+                </div>
+              </div>
+
+              {formData.payType === 'HOURLY' ? (
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {t('hourlyRate')}
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={formData.hourlyRate}
+                    onChange={(e) => setFormData({ ...formData, hourlyRate: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+              ) : (
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {t('annualSalary')}
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={formData.annualSalary}
+                    onChange={(e) => setFormData({ ...formData, annualSalary: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+              )}
+
               <div className="flex gap-3">
                 <button
                   type="button"
                   onClick={() => {
                     setShowModal(false);
-                    setFormData({ name: '', employeeId: '' });
+                    setFormData({
+                      name: '',
+                      employeeId: '',
+                      company: '',
+                      payType: 'HOURLY',
+                      hourlyRate: '',
+                      annualSalary: '',
+                    });
                     setEditingWorker(null);
                   }}
                   className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"

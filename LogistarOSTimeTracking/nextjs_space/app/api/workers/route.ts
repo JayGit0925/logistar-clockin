@@ -7,6 +7,18 @@ function generatePin(): string {
   return Math.floor(1000 + Math.random() * 9000).toString();
 }
 
+function parseDecimal(v: unknown): string | null {
+  if (v === null || v === undefined || v === '') return null;
+  const n = Number(v);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return n.toFixed(2);
+}
+
+function parsePayType(v: unknown): 'HOURLY' | 'SALARY' | undefined {
+  if (v === 'HOURLY' || v === 'SALARY') return v;
+  return undefined;
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -20,6 +32,10 @@ export async function GET(request: Request) {
         employeeId: true,
         pin: includePin,
         paidLunch: true,
+        company: true,
+        payType: true,
+        hourlyRate: true,
+        annualSalary: true,
         createdAt: true,
       },
     });
@@ -36,7 +52,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { name, employeeId } = body;
+    const { name, employeeId, company, payType, hourlyRate, annualSalary } = body;
 
     if (!name) {
       return NextResponse.json(
@@ -52,6 +68,10 @@ export async function POST(request: Request) {
         name,
         employeeId: employeeId || null,
         pin,
+        company: company?.trim() || null,
+        payType: parsePayType(payType) ?? 'HOURLY',
+        hourlyRate: parseDecimal(hourlyRate),
+        annualSalary: parseDecimal(annualSalary),
       },
     });
 

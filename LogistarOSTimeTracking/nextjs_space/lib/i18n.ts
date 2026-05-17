@@ -126,6 +126,16 @@ export const translations = {
     page: 'Page',
     all: 'All',
 
+    // Salary & company
+    company: 'Company',
+    payType: 'Pay Type',
+    hourly: 'Hourly',
+    salary: 'Salary',
+    hourlyRate: 'Hourly Rate ($/hr)',
+    annualSalary: 'Annual Salary ($/yr)',
+    filterByCompany: 'Filter by company',
+    allCompanies: 'All companies',
+
     // Language
     language: 'Language',
   },
@@ -247,6 +257,16 @@ export const translations = {
     page: '第',
     all: '全部',
 
+    // Salary & company
+    company: '公司',
+    payType: '薪资类型',
+    hourly: '时薪',
+    salary: '月薪',
+    hourlyRate: '时薪 ($/hr)',
+    annualSalary: '年薪 ($/yr)',
+    filterByCompany: '按公司筛选',
+    allCompanies: '所有公司',
+
     language: '语言',
   },
   es: {
@@ -366,6 +386,16 @@ export const translations = {
     next: 'Siguiente',
     page: 'Página',
     all: 'Todo',
+
+    // Salary & company
+    company: 'Empresa',
+    payType: 'Tipo de pago',
+    hourly: 'Por hora',
+    salary: 'Salario',
+    hourlyRate: 'Tarifa por hora ($/hr)',
+    annualSalary: 'Salario anual ($/año)',
+    filterByCompany: 'Filtrar por empresa',
+    allCompanies: 'Todas las empresas',
 
     language: 'Idioma',
   },
